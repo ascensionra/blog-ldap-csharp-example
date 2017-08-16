@@ -20,7 +20,15 @@ namespace LDAPClient
             var serverId = new LdapDirectoryIdentifier(url);
 
             connection = new LdapConnection(serverId, credentials);
-            connection.Bind();      
+            try
+            {
+                connection.Bind();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Caught exception while connecting to LDAP server: " + e);
+            }
+
         }
 
         /// <summary>
@@ -37,7 +45,7 @@ namespace LDAPClient
 
             var result = new List<Dictionary<string, string>>();
 
-            foreach(SearchResultEntry entry in response.Entries)
+            foreach (SearchResultEntry entry in response.Entries)
             {
                 var dic = new Dictionary<string, string>();
                 dic["DN"] = entry.DistinguishedName;
@@ -68,8 +76,10 @@ namespace LDAPClient
                 new DirectoryAttribute("uid", user.UID),
                 new DirectoryAttribute("ou", user.OU),
                 new DirectoryAttribute("userPassword", "{SHA}" + digest),
-                new DirectoryAttribute("objectClass", new string[] { "top", "account", "simpleSecurityObject" })
+                new DirectoryAttribute("objectClass", new string[] { "top", "person", "organizationalPerson", "user" })
             });
+
+            //var request = new AddRequest(user.DN, new DirectoryAttribute("objectClass", new string[] { "top", "person", "organizationalPerson", "user" }));
 
             connection.SendRequest(request);
         }
@@ -89,6 +99,46 @@ namespace LDAPClient
 
             request = new ModifyRequest(newDn, DirectoryAttributeOperation.Replace, "uid", new string[] { newUid });
             connection.SendRequest(request);
+        }
+
+        /// <summary>
+        /// This method enables a user account
+        /// </summary>
+        /// <param name="dn">Distinguished name of the account to activate</param>
+        public void changeActiveState(string dn)
+        {
+            Console.WriteLine("\r\nchangeActiveState: performing search");
+            int newUac;
+            try
+            {
+                var searchResult = search(dn, "objectClass=user");
+                string uac;
+
+                Dictionary<string, string> res;
+                res = searchResult[0];
+                Console.WriteLine("Copied dict out of list");
+                res.TryGetValue("useraccountcontrol", out uac);
+                newUac = (int.Parse(uac) & (~int.Parse(uac)));
+
+                //foreach (Dictionary<string, string> d in searchResult)
+                //{
+                //    d.TryGetValue("useraccountcontrol", out uac);
+                //    Console.WriteLine("userAccountControl: " + uac);
+                //    int testInt = int.Parse(uac);
+                //    newUac = (testInt & (~2));
+                //    Console.WriteLine("~testInt: " + (~testInt).ToString());
+                //    Console.WriteLine("userAccountControl modified (& ~): " + (newUac).ToString());
+                //}
+                DirectoryRequest request = new ModifyRequest(dn, DirectoryAttributeOperation.Replace, "useraccountcontrol", new string[] { newUac.ToString() });
+                connection.SendRequest(request);
+            }
+            catch (System.DirectoryServices.Protocols.DirectoryOperationException e)
+            {
+                Console.WriteLine("Encountered problem activating " + dn);
+                Console.WriteLine("Caught exception: " + e);
+            }
+
+
         }
 
         /// <summary>
@@ -113,7 +163,7 @@ namespace LDAPClient
         {
             var sha1 = new SHA1Managed();
             var digest = Convert.ToBase64String(sha1.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password)));
-            var request = new CompareRequest(string.Format("uid={0},ou=users,dc=example,dc=com", username), 
+            var request = new CompareRequest(string.Format("uid={0},ou=users,dc=example,dc=com", username),
                 "userPassword", "{SHA}" + digest);
             var response = (CompareResponse)connection.SendRequest(request);
             return response.ResultCode == ResultCode.CompareTrue;
