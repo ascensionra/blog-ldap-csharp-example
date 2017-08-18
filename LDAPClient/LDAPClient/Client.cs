@@ -87,17 +87,19 @@ namespace LDAPClient
         /// <summary>
         /// This method shows how to modify an attribute.
         /// </summary>
+        /// <param name="dn">Distinguished Name for user</param>
         /// <param name="oldUid">Old user UID</param>
         /// <param name="newUid">New user UID</param>
-        public void changeUserUid(string oldUid, string newUid)
+        public void changeUserUid(string dn, string oldUid, string newUid)
         {
-            var oldDn = string.Format("uid={0},ou=users,dc=example,dc=com", oldUid);
-            var newDn = string.Format("uid={0},ou=users,dc=example,dc=com", newUid);
+            //var userDN = "OU=Test,OU=Generic Accounts,OU=Information Technology,OU=roundrocktexas.gov,DC=corr,DC=round-rock,DC=tx,DC=us";
+            //var oldDn = string.Format("uid={0},{1}", oldUid, userDN);
+            //var newDn = string.Format("uid={0},{1}", newUid, userDN);
 
-            DirectoryRequest request = new ModifyDNRequest(oldDn, "ou=users,dc=example,dc=com", "uid=" + newUid);
-            connection.SendRequest(request);
+            //DirectoryRequest request = new ModifyDNRequest(oldDn, userDN, "uid=" + newUid);
+            //connection.SendRequest(request);
 
-            request = new ModifyRequest(newDn, DirectoryAttributeOperation.Replace, "uid", new string[] { newUid });
+            DirectoryRequest request = new ModifyRequest(dn, DirectoryAttributeOperation.Replace, "uid", new string[] { newUid });
             connection.SendRequest(request);
         }
 
@@ -108,7 +110,6 @@ namespace LDAPClient
         public void changeActiveState(string dn)
         {
             Console.WriteLine("\r\nchangeActiveState: performing search");
-            int newUac;
             try
             {
                 var searchResult = search(dn, "objectClass=user");
@@ -118,8 +119,10 @@ namespace LDAPClient
                 res = searchResult[0];
                 Console.WriteLine("Copied dict out of list");
                 res.TryGetValue("useraccountcontrol", out uac);
-                newUac = (int.Parse(uac) & (~int.Parse(uac)));
+                Console.WriteLine("UAC: {0}", uac);
+                //newUac = (int.Parse(uac) & (~int.Parse(uac)));
 
+                
                 //foreach (Dictionary<string, string> d in searchResult)
                 //{
                 //    d.TryGetValue("useraccountcontrol", out uac);
@@ -129,13 +132,27 @@ namespace LDAPClient
                 //    Console.WriteLine("~testInt: " + (~testInt).ToString());
                 //    Console.WriteLine("userAccountControl modified (& ~): " + (newUac).ToString());
                 //}
-                DirectoryRequest request = new ModifyRequest(dn, DirectoryAttributeOperation.Replace, "useraccountcontrol", new string[] { newUac.ToString() });
-                connection.SendRequest(request);
+                //Console.WriteLine("*** Attempting to activate user with UAC {0}", "544");
+                //Console.WriteLine("*** Attempting to deactivate user with UAC {0}", "546");
+                Console.WriteLine("*** Attempting to modify {0} attribute using mod collection", "description");
+                DirectoryAttributeModificationCollection modColl = new DirectoryAttributeModificationCollection();
+                var dirMods = new DirectoryAttributeModification();
+                dirMods.Name = "description";
+                dirMods.Add("testing");
+                dirMods.Operation = DirectoryAttributeOperation.Replace;
+                modColl.Add(dirMods);
+                DirectoryRequest request = new ModifyRequest(dn, DirectoryAttributeOperation.Replace, "useraccountcontrol", new string[] { "544" });
+                DirectoryRequest request1 = new ModifyRequest(dn, new DirectoryAttributeModification[] { dirMods });
+                connection.SendRequest(request1);
             }
             catch (System.DirectoryServices.Protocols.DirectoryOperationException e)
             {
                 Console.WriteLine("Encountered problem activating " + dn);
                 Console.WriteLine("Caught exception: " + e);
+            }
+            catch (System.ArgumentException e)
+            {
+                Console.WriteLine("Caught argument exception: " + e);
             }
 
 
@@ -163,7 +180,7 @@ namespace LDAPClient
         {
             var sha1 = new SHA1Managed();
             var digest = Convert.ToBase64String(sha1.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password)));
-            var request = new CompareRequest(string.Format("uid={0},ou=users,dc=example,dc=com", username),
+            var request = new CompareRequest(string.Format("uid={0},OU=Test,OU=Generic Accounts,OU=Information Technology,OU=roundrocktexas.gov,DC=corr,DC=round-rock,DC=tx,DC=us", username),
                 "userPassword", "{SHA}" + digest);
             var response = (CompareResponse)connection.SendRequest(request);
             return response.ResultCode == ResultCode.CompareTrue;
@@ -190,6 +207,7 @@ namespace LDAPClient
             }
             catch (Exception)
             {
+                Console.WriteLine("Caught exception during bind operation");
                 result = false;
             }
 

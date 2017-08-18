@@ -17,9 +17,11 @@ namespace LDAPClient
             }
 
             var client = new Client(args[0], args[1], args[2], args[3]);
+            var context = new Context(args[0], args[1], args[2], args[3]);
+            Console.WriteLine("Context.authenticated: {0}", "foo");
             var user = "sampleuser";
             var newUser = new UserModel("CN=Sample User,OU=Test,OU=Generic Accounts,OU=Information Technology,OU=roundrocktexas.gov,DC=corr,DC=round-rock,DC=tx,DC=us",
-                    "sampleuser", "Test", "plaintextpass");
+                    "sampleuser", "Test", "pl@int3xtpa55!");
 
             try
             {
@@ -46,14 +48,14 @@ namespace LDAPClient
             foreach (Dictionary<string, string> d in searchResult)
             {
                 Console.WriteLine(String.Join("\r\n", d.Select(x => x.Key + ": " + x.Value).ToArray()));
-                
+                Console.WriteLine("\r\nFound user\r\n");
             }
 
             //Changing active state of user
             client.changeActiveState(newUser.DN);
 
             //Validating credentials
-            //if (client.validateUser("sampleuser", "plaintextpass"))
+            //if (client.validateUser("sampleuser", "pl@int3xtpa55!"))
             //{
             //    Console.WriteLine("Valid credentials");
             //}
@@ -64,20 +66,46 @@ namespace LDAPClient
 
             //Validating credentials using LDAP bind
             //For this to work the server must be configured to map users correctly to its internal database
-            //if (client.validateUserByBind("sampleuser", "plaintextpass"))
-            //{
-            //    Console.WriteLine("Valid credentials (bind)");
-            //}
-            //else
-            //{
-            //    Console.WriteLine("Invalid credentials (bind)");
-            //}
+            if (client.validateUserByBind("sampleuser@roundrocktexas.gov", "pl@int3xtpa55!"))
+            {
+                Console.WriteLine("Valid credentials (bind)");
+            }
+            else
+            {
+                Console.WriteLine("Invalid credentials (bind)");
+            }
 
             //Modifying a user
-            //client.changeUserUid("sampleuser", "newsampleuser");
+            //try
+            //{
+            //    Console.WriteLine("*** Attempting to change user UID");
+            //    client.changeUserUid(newUser.DN, "sampleuser", "newsampleuser");
+            //}
+            //catch (Exception e)
+            //{
+            //    Console.WriteLine("Caught exception trying to update user UID: " + e);
+            //}
+
 
             //Deleting a user
-            //client.delete("uid=newsampleuser,ou=users,dc=example,dc=com");
+            //try
+            //{
+            //    string userDN = "CN=Sample User,OU=Test,OU=Generic Accounts,OU=Information Technology,OU=roundrocktexas.gov,DC=corr,DC=round-rock,DC=tx,DC=us";
+            //    Console.WriteLine("*** Attempting to delete {0}", newUser.UID);
+            //    client.delete(userDN);
+            //}
+            //catch(Exception e)
+            //{
+            //    Console.WriteLine("Caught exception during delete attempt: {0}", e);
+            //}
+
+            //Searching for all users
+            searchResult = client.search(newUser.DN, "objectClass=*");
+            foreach (Dictionary<string, string> d in searchResult)
+            {
+                Console.WriteLine(String.Join("\r\n", d.Select(x => x.Key + ": " + x.Value).ToArray()));
+                Console.WriteLine("\r\nFound user\r\n");
+            }
         }
     }
 }
